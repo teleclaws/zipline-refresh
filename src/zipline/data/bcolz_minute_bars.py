@@ -11,10 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from abc import ABC, abstractmethod
 import json
 import logging
 import os
-from abc import ABC, abstractmethod
 from glob import glob
 from os.path import join
 
@@ -32,8 +32,9 @@ from zipline.data._minute_bar_internal import (
     find_position_of_minute,
     minute_value,
 )
-from zipline.data.bar_reader import BarReader, NoDataForSid, NoDataOnDate
+from zipline.data.bar_reader import NoDataForSid, NoDataOnDate
 from zipline.data.bcolz_daily_bars import check_uint32_safe
+from zipline.data.minute_bar_reader import MinuteBarReader
 from zipline.gens.sim_engine import NANOS_IN_MINUTE
 from zipline.utils.calendar_utils import get_calendar
 from zipline.utils.cli import maybe_show_progress
@@ -56,12 +57,6 @@ class BcolzMinuteOverlappingData(Exception):
 
 class BcolzMinuteWriterColumnMismatch(Exception):
     pass
-
-
-class MinuteBarReader(BarReader):
-    @property
-    def data_frequency(self):
-        return "minute"
 
 
 def _calc_minute_index(market_opens, minutes_per_day):

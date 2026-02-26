@@ -67,6 +67,14 @@ from ..data.hdf5_daily_bars import (
     HDF5DailyBarWriter,
     MultiCountryDailyBarReader,
 )
+from ..data.parquet_daily_bars import (
+    ParquetDailyBarReader,
+    ParquetDailyBarWriter,
+)
+from ..data.parquet_minute_bars import (
+    ParquetMinuteBarReader,
+    ParquetMinuteBarWriter,
+)
 from ..data.bcolz_minute_bars import (
     BcolzMinuteBarReader,
     BcolzMinuteBarWriter,
@@ -1209,6 +1217,64 @@ class WithBcolzEquityDailyBarReaderFromCSVs(WithBcolzEquityDailyBarReader):
     _write_method_name = "write_csvs"
 
 
+class WithParquetEquityDailyBarReader(WithEquityDailyBarData, WithTmpDir):
+    """ZiplineTestCase mixin providing cls.parquet_equity_daily_bar_reader.
+
+    After init_class_fixtures has been called:
+    - `cls.parquet_daily_bar_path` is populated with
+      `cls.tmpdir.getpath(cls.PARQUET_DAILY_BAR_PATH)`.
+    - `cls.parquet_equity_daily_bar_reader` is a ParquetDailyBarReader
+       pointing to the directory that was just written to.
+
+    Attributes
+    ----------
+    PARQUET_DAILY_BAR_PATH : str
+        The path inside the tmpdir where this will be written.
+    """
+
+    PARQUET_DAILY_BAR_PATH = "daily_equity_pricing.parquet"
+
+    @classproperty
+    def PARQUET_DAILY_BAR_COUNTRY_CODE(cls):
+        return cls.EQUITY_DAILY_BAR_COUNTRY_CODES[0]
+
+    @classmethod
+    def init_class_fixtures(cls):
+        super(WithParquetEquityDailyBarReader, cls).init_class_fixtures()
+
+        cls.parquet_daily_bar_path = p = cls.tmpdir.makedir(
+            cls.PARQUET_DAILY_BAR_PATH
+        )
+
+        days = cls.equity_daily_bar_days
+        sids = cls.asset_finder.equities_sids_for_country_code(
+            cls.PARQUET_DAILY_BAR_COUNTRY_CODE
+        )
+
+        trading_calendar = cls.trading_calendars[Equity]
+        writer = ParquetDailyBarWriter(
+            p, trading_calendar, days[0], days[-1],
+        )
+
+        data = list(cls.make_equity_daily_bar_data(
+            country_code=cls.PARQUET_DAILY_BAR_COUNTRY_CODE,
+            sids=sids,
+        ))
+        data_sids = [pair[0] for pair in data]
+
+        currency_codes = cls.make_equity_daily_bar_currency_codes(
+            country_code=cls.PARQUET_DAILY_BAR_COUNTRY_CODE,
+            sids=data_sids,
+        )
+
+        writer.write(
+            iter(data),
+            currency_codes=currency_codes,
+        )
+
+        cls.parquet_equity_daily_bar_reader = ParquetDailyBarReader(p)
+
+
 def _trading_days_for_minute_bars(calendar, start_date, end_date, lookback_days):
     first_session = calendar.minute_to_session(start_date)
 
@@ -1514,6 +1580,46 @@ class WithBcolzEquityMinuteBarReader(WithEquityMinuteBarData, WithTmpDir):
         writer.write(cls.make_equity_minute_bar_data())
 
         cls.bcolz_equity_minute_bar_reader = BcolzMinuteBarReader(p)
+
+
+class WithParquetEquityMinuteBarReader(WithEquityMinuteBarData, WithTmpDir):
+    """
+    ZiplineTestCase mixin providing cls.parquet_equity_minute_bar_reader.
+
+    After init_class_fixtures has been called:
+    - `cls.parquet_equity_minute_bar_reader` is a ParquetMinuteBarReader
+      populated with data from `cls.make_equity_minute_bar_data()`.
+
+    See Also
+    --------
+    WithBcolzEquityMinuteBarReader
+    WithParquetEquityDailyBarReader
+    """
+
+    PARQUET_EQUITY_MINUTE_BAR_PATH = "minute_equity_pricing.parquet"
+
+    @classmethod
+    def make_parquet_equity_minute_bar_rootdir_path(cls):
+        return cls.tmpdir.makedir(cls.PARQUET_EQUITY_MINUTE_BAR_PATH)
+
+    @classmethod
+    def init_class_fixtures(cls):
+        super(WithParquetEquityMinuteBarReader, cls).init_class_fixtures()
+        cls.parquet_equity_minute_bar_path = p = (
+            cls.make_parquet_equity_minute_bar_rootdir_path()
+        )
+        days = cls.equity_minute_bar_days
+
+        writer = ParquetMinuteBarWriter(
+            p,
+            cls.trading_calendars[Equity],
+            days[0],
+            days[-1],
+            US_EQUITIES_MINUTES_PER_DAY,
+        )
+        writer.write(cls.make_equity_minute_bar_data())
+
+        cls.parquet_equity_minute_bar_reader = ParquetMinuteBarReader(p)
 
 
 class WithBcolzFutureMinuteBarReader(WithFutureMinuteBarData, WithTmpDir):

@@ -65,6 +65,7 @@ dependencies = [
     'tables >=3.4.3',
     'toolz >=0.8.2',
     'exchange-calendars >=4.2.4',
+    'pyarrow >=14.0',
 ]
 
 [project.urls]
