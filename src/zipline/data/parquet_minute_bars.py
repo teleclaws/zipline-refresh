@@ -228,6 +228,10 @@ class ParquetMinuteBarReader(MinuteBarReader):
     def trading_calendar(self):
         return get_calendar(self._metadata["calendar_name"])
 
+    @property
+    def calendar(self):
+        return self.trading_calendar
+
     @lazyval
     def first_trading_day(self):
         return pd.Timestamp(self._metadata["start_session_ns"])
@@ -418,6 +422,8 @@ class ParquetMinuteBarReader(MinuteBarReader):
             return pd.NaT
 
         minutes = self._minutes
+        if dt.tzinfo is None:
+            dt = dt.tz_localize("UTC")
         idx = minutes.searchsorted(dt, side="right") - 1
         if idx < 0:
             return pd.NaT

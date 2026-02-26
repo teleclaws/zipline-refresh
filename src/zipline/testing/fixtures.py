@@ -48,10 +48,6 @@ from ..data.adjustments import (
     SQLiteAdjustmentReader,
     SQLiteAdjustmentWriter,
 )
-from ..data.bcolz_daily_bars import (
-    BcolzDailyBarReader,
-    BcolzDailyBarWriter,
-)
 from ..data.data_portal import (
     DataPortal,
     DEFAULT_MINUTE_HISTORY_PREFETCH,
@@ -75,9 +71,7 @@ from ..data.parquet_minute_bars import (
     ParquetMinuteBarReader,
     ParquetMinuteBarWriter,
 )
-from ..data.bcolz_minute_bars import (
-    BcolzMinuteBarReader,
-    BcolzMinuteBarWriter,
+from ..data.bar_reader import (
     US_EQUITIES_MINUTES_PER_DAY,
     FUTURES_MINUTES_PER_DAY,
 )
@@ -944,7 +938,7 @@ class WithFutureDailyBarData(WithAssetFinder, WithTradingCalendars):
     -------
     make_future_daily_bar_data() -> iterable[(int, pd.DataFrame)]
         A class method that returns an iterator of (sid, dataframe) pairs
-        which will be written to the bcolz files that the class's
+        which will be written to the bar files that the class's
         ``BcolzDailyBarReader`` will read from. By default this creates
         some simple synthetic data with
         :func:`~zipline.testing.create_daily_bar_data`
@@ -1021,202 +1015,6 @@ class WithFutureDailyBarData(WithAssetFinder, WithTradingCalendars):
         cls.future_daily_bar_days = days
 
 
-class WithBcolzEquityDailyBarReader(WithEquityDailyBarData, WithTmpDir):
-    """ZiplineTestCase mixin providing cls.bcolz_daily_bar_path,
-    cls.bcolz_daily_bar_ctable, and cls.bcolz_equity_daily_bar_reader
-    class level fixtures.
-
-    After init_class_fixtures has been called:
-    - `cls.bcolz_daily_bar_path` is populated with
-      `cls.tmpdir.getpath(cls.BCOLZ_DAILY_BAR_PATH)`.
-    - `cls.bcolz_daily_bar_ctable` is populated with data returned from
-      `cls.make_equity_daily_bar_data`. By default this calls
-      :func:`zipline.pipeline.loaders.synthetic.make_equity_daily_bar_data`.
-    - `cls.bcolz_equity_daily_bar_reader` is a daily bar reader
-       pointing to the directory that was just written to.
-
-    Attributes
-    ----------
-    BCOLZ_DAILY_BAR_PATH : str
-        The path inside the tmpdir where this will be written.
-    EQUITY_DAILY_BAR_LOOKBACK_DAYS : int
-        The number of days of data to add before the first day. This is used
-        when a test needs to use history, in which case this should be set to
-        the largest history window that will be
-        requested.
-    EQUITY_DAILY_BAR_USE_FULL_CALENDAR : bool
-        If this flag is set the ``equity_daily_bar_days`` will be the full
-        set of trading days from the trading environment. This flag overrides
-        ``EQUITY_DAILY_BAR_LOOKBACK_DAYS``.
-    BCOLZ_DAILY_BAR_READ_ALL_THRESHOLD : int
-        If this flag is set, use the value as the `read_all_threshold`
-        parameter to BcolzDailyBarReader, otherwise use the default
-        value.
-    EQUITY_DAILY_BAR_SOURCE_FROM_MINUTE : bool
-        If this flag is set, `make_equity_daily_bar_data` will read data from
-        the minute bar reader defined by a `WithBcolzEquityMinuteBarReader`.
-
-    Methods
-    -------
-    make_bcolz_daily_bar_rootdir_path() -> string
-        A class method that returns the path for the rootdir of the daily
-        bars ctable. By default this is a subdirectory BCOLZ_DAILY_BAR_PATH in
-        the shared temp directory.
-
-    See Also
-    --------
-    WithBcolzEquityMinuteBarReader
-    WithDataPortal
-    zipline.testing.create_daily_bar_data
-    """
-
-    BCOLZ_DAILY_BAR_PATH = "daily_equity_pricing.bcolz"
-    BCOLZ_DAILY_BAR_READ_ALL_THRESHOLD = None
-    EQUITY_DAILY_BAR_SOURCE_FROM_MINUTE = False
-    # allows WithBcolzEquityDailyBarReaderFromCSVs to call the
-    # `write_csvs`method without needing to reimplement `init_class_fixtures`
-    _write_method_name = "write"
-    # What to do when data being written is invalid, e.g. nan, inf, etc.
-    # options are: 'warn', 'raise', 'ignore'
-    INVALID_DATA_BEHAVIOR = "warn"
-
-    @classproperty
-    def BCOLZ_DAILY_BAR_COUNTRY_CODE(cls):
-        return cls.EQUITY_DAILY_BAR_COUNTRY_CODES[0]
-
-    @classmethod
-    def make_bcolz_daily_bar_rootdir_path(cls):
-        return cls.tmpdir.makedir(cls.BCOLZ_DAILY_BAR_PATH)
-
-    @classmethod
-    def init_class_fixtures(cls):
-        super(WithBcolzEquityDailyBarReader, cls).init_class_fixtures()
-
-        cls.bcolz_daily_bar_path = p = cls.make_bcolz_daily_bar_rootdir_path()
-
-        days = cls.equity_daily_bar_days
-        sids = cls.asset_finder.equities_sids_for_country_code(
-            cls.BCOLZ_DAILY_BAR_COUNTRY_CODE
-        )
-
-        trading_calendar = cls.trading_calendars[Equity]
-        cls.bcolz_daily_bar_ctable = t = getattr(
-            BcolzDailyBarWriter(p, trading_calendar, days[0], days[-1]),
-            cls._write_method_name,
-        )(
-            cls.make_equity_daily_bar_data(
-                country_code=cls.BCOLZ_DAILY_BAR_COUNTRY_CODE,
-                sids=sids,
-            ),
-            invalid_data_behavior=cls.INVALID_DATA_BEHAVIOR,
-        )
-
-        if cls.BCOLZ_DAILY_BAR_READ_ALL_THRESHOLD is not None:
-            cls.bcolz_equity_daily_bar_reader = BcolzDailyBarReader(
-                t, cls.BCOLZ_DAILY_BAR_READ_ALL_THRESHOLD
-            )
-        else:
-            cls.bcolz_equity_daily_bar_reader = BcolzDailyBarReader(t)
-
-
-class WithBcolzFutureDailyBarReader(WithFutureDailyBarData, WithTmpDir):
-    """ZiplineTestCase mixin providing cls.bcolz_daily_bar_path,
-    cls.bcolz_daily_bar_ctable, and cls.bcolz_future_daily_bar_reader
-    class level fixtures.
-
-    After init_class_fixtures has been called:
-    - `cls.bcolz_daily_bar_path` is populated with
-      `cls.tmpdir.getpath(cls.BCOLZ_DAILY_BAR_PATH)`.
-    - `cls.bcolz_daily_bar_ctable` is populated with data returned from
-      `cls.make_future_daily_bar_data`. By default this calls
-      :func:`zipline.pipeline.loaders.synthetic.make_future_daily_bar_data`.
-    - `cls.bcolz_future_daily_bar_reader` is a daily bar reader
-       pointing to the directory that was just written to.
-
-    Attributes
-    ----------
-    BCOLZ_DAILY_BAR_PATH : str
-        The path inside the tmpdir where this will be written.
-    FUTURE_DAILY_BAR_LOOKBACK_DAYS : int
-        The number of days of data to add before the first day. This is used
-        when a test needs to use history, in which case this should be set to
-        the largest history window that will be
-        requested.
-    FUTURE_DAILY_BAR_USE_FULL_CALENDAR : bool
-        If this flag is set the ``future_daily_bar_days`` will be the full
-        set of trading days from the trading environment. This flag overrides
-        ``FUTURE_DAILY_BAR_LOOKBACK_DAYS``.
-    BCOLZ_FUTURE_DAILY_BAR_READ_ALL_THRESHOLD : int
-        If this flag is set, use the value as the `read_all_threshold`
-        parameter to BcolzDailyBarReader, otherwise use the default
-        value.
-    FUTURE_DAILY_BAR_SOURCE_FROM_MINUTE : bool
-        If this flag is set, `make_future_daily_bar_data` will read data from
-        the minute bar reader defined by a `WithBcolzFutureMinuteBarReader`.
-
-    Methods
-    -------
-    make_bcolz_daily_bar_rootdir_path() -> string
-        A class method that returns the path for the rootdir of the daily
-        bars ctable. By default this is a subdirectory BCOLZ_DAILY_BAR_PATH in
-        the shared temp directory.
-
-    See Also
-    --------
-    WithBcolzFutureMinuteBarReader
-    WithDataPortal
-    zipline.testing.create_daily_bar_data
-    """
-
-    BCOLZ_FUTURE_DAILY_BAR_PATH = "daily_future_pricing.bcolz"
-    BCOLZ_FUTURE_DAILY_BAR_READ_ALL_THRESHOLD = None
-    FUTURE_DAILY_BAR_SOURCE_FROM_MINUTE = False
-
-    # What to do when data being written is invalid, e.g. nan, inf, etc.
-    # options are: 'warn', 'raise', 'ignore'
-    BCOLZ_FUTURE_DAILY_BAR_INVALID_DATA_BEHAVIOR = "warn"
-
-    BCOLZ_FUTURE_DAILY_BAR_WRITE_METHOD_NAME = "write"
-
-    @classmethod
-    def make_bcolz_future_daily_bar_rootdir_path(cls):
-        return cls.tmpdir.makedir(cls.BCOLZ_FUTURE_DAILY_BAR_PATH)
-
-    @classmethod
-    def init_class_fixtures(cls):
-        super(WithBcolzFutureDailyBarReader, cls).init_class_fixtures()
-
-        p = cls.make_bcolz_future_daily_bar_rootdir_path()
-        cls.future_bcolz_daily_bar_path = p
-        days = cls.future_daily_bar_days
-
-        trading_calendar = cls.trading_calendars[Future]
-        cls.future_bcolz_daily_bar_ctable = t = getattr(
-            BcolzDailyBarWriter(p, trading_calendar, days[0], days[-1]),
-            cls.BCOLZ_FUTURE_DAILY_BAR_WRITE_METHOD_NAME,
-        )(
-            cls.make_future_daily_bar_data(),
-            invalid_data_behavior=(cls.BCOLZ_FUTURE_DAILY_BAR_INVALID_DATA_BEHAVIOR),
-        )
-
-        if cls.BCOLZ_FUTURE_DAILY_BAR_READ_ALL_THRESHOLD is not None:
-            cls.bcolz_future_daily_bar_reader = BcolzDailyBarReader(
-                t, cls.BCOLZ_FUTURE_DAILY_BAR_READ_ALL_THRESHOLD
-            )
-        else:
-            cls.bcolz_future_daily_bar_reader = BcolzDailyBarReader(t)
-
-
-class WithBcolzEquityDailyBarReaderFromCSVs(WithBcolzEquityDailyBarReader):
-    """
-    ZiplineTestCase mixin that provides
-    cls.bcolz_equity_daily_bar_reader from a mapping of sids to CSV
-    file paths.
-    """
-
-    _write_method_name = "write_csvs"
-
-
 class WithParquetEquityDailyBarReader(WithEquityDailyBarData, WithTmpDir):
     """ZiplineTestCase mixin providing cls.parquet_equity_daily_bar_reader.
 
@@ -1273,6 +1071,28 @@ class WithParquetEquityDailyBarReader(WithEquityDailyBarData, WithTmpDir):
         )
 
         cls.parquet_equity_daily_bar_reader = ParquetDailyBarReader(p)
+
+
+class WithParquetFutureDailyBarReader(WithFutureDailyBarData, WithTmpDir):
+    """ZiplineTestCase mixin providing cls.parquet_future_daily_bar_reader."""
+
+    PARQUET_FUTURE_DAILY_BAR_PATH = "daily_future_pricing.parquet"
+
+    @classmethod
+    def init_class_fixtures(cls):
+        super(WithParquetFutureDailyBarReader, cls).init_class_fixtures()
+
+        p = cls.tmpdir.makedir(cls.PARQUET_FUTURE_DAILY_BAR_PATH)
+        cls.parquet_future_daily_bar_path = p
+        days = cls.future_daily_bar_days
+
+        trading_calendar = cls.trading_calendars[Future]
+        writer = ParquetDailyBarWriter(
+            p, trading_calendar, days[0], days[-1],
+        )
+        writer.write(cls.make_future_daily_bar_data())
+
+        cls.parquet_future_daily_bar_reader = ParquetDailyBarReader(p)
 
 
 def _trading_days_for_minute_bars(calendar, start_date, end_date, lookback_days):
@@ -1522,66 +1342,6 @@ class WithFutureMinuteBarData(WithAssetFinder, WithTradingCalendars):
         )
 
 
-class WithBcolzEquityMinuteBarReader(WithEquityMinuteBarData, WithTmpDir):
-    """
-    ZiplineTestCase mixin providing cls.bcolz_minute_bar_path,
-    cls.bcolz_minute_bar_ctable, and cls.bcolz_equity_minute_bar_reader
-    class level fixtures.
-
-    After init_class_fixtures has been called:
-    - `cls.bcolz_minute_bar_path` is populated with
-      `cls.tmpdir.getpath(cls.BCOLZ_MINUTE_BAR_PATH)`.
-    - `cls.bcolz_minute_bar_ctable` is populated with data returned from
-      `cls.make_equity_minute_bar_data`. By default this calls
-      :func:`zipline.pipeline.loaders.synthetic.make_equity_minute_bar_data`.
-    - `cls.bcolz_equity_minute_bar_reader` is a minute bar reader
-       pointing to the directory that was just written to.
-
-    Attributes
-    ----------
-    BCOLZ_MINUTE_BAR_PATH : str
-        The path inside the tmpdir where this will be written.
-
-    Methods
-    -------
-    make_bcolz_minute_bar_rootdir_path() -> string
-        A class method that returns the path for the directory that contains
-        the minute bar ctables. By default this is a subdirectory
-        BCOLZ_MINUTE_BAR_PATH in the shared temp directory.
-
-    See Also
-    --------
-    WithBcolzEquityDailyBarReader
-    WithDataPortal
-    zipline.testing.create_minute_bar_data
-    """
-
-    BCOLZ_EQUITY_MINUTE_BAR_PATH = "minute_equity_pricing"
-
-    @classmethod
-    def make_bcolz_equity_minute_bar_rootdir_path(cls):
-        return cls.tmpdir.makedir(cls.BCOLZ_EQUITY_MINUTE_BAR_PATH)
-
-    @classmethod
-    def init_class_fixtures(cls):
-        super(WithBcolzEquityMinuteBarReader, cls).init_class_fixtures()
-        cls.bcolz_equity_minute_bar_path = p = (
-            cls.make_bcolz_equity_minute_bar_rootdir_path()
-        )
-        days = cls.equity_minute_bar_days
-
-        writer = BcolzMinuteBarWriter(
-            p,
-            cls.trading_calendars[Equity],
-            days[0],
-            days[-1],
-            US_EQUITIES_MINUTES_PER_DAY,
-        )
-        writer.write(cls.make_equity_minute_bar_data())
-
-        cls.bcolz_equity_minute_bar_reader = BcolzMinuteBarReader(p)
-
-
 class WithParquetEquityMinuteBarReader(WithEquityMinuteBarData, WithTmpDir):
     """
     ZiplineTestCase mixin providing cls.parquet_equity_minute_bar_reader.
@@ -1622,67 +1382,34 @@ class WithParquetEquityMinuteBarReader(WithEquityMinuteBarData, WithTmpDir):
         cls.parquet_equity_minute_bar_reader = ParquetMinuteBarReader(p)
 
 
-class WithBcolzFutureMinuteBarReader(WithFutureMinuteBarData, WithTmpDir):
-    """
-    ZiplineTestCase mixin providing cls.bcolz_minute_bar_path,
-    cls.bcolz_minute_bar_ctable, and cls.bcolz_equity_minute_bar_reader
-    class level fixtures.
+class WithParquetFutureMinuteBarReader(WithFutureMinuteBarData, WithTmpDir):
+    """ZiplineTestCase mixin providing cls.parquet_future_minute_bar_reader."""
 
-    After init_class_fixtures has been called:
-    - `cls.bcolz_minute_bar_path` is populated with
-      `cls.tmpdir.getpath(cls.BCOLZ_MINUTE_BAR_PATH)`.
-    - `cls.bcolz_minute_bar_ctable` is populated with data returned from
-      `cls.make_equity_minute_bar_data`. By default this calls
-      :func:`zipline.pipeline.loaders.synthetic.make_equity_minute_bar_data`.
-    - `cls.bcolz_equity_minute_bar_reader` is a minute bar reader
-       pointing to the directory that was just written to.
-
-    Attributes
-    ----------
-    BCOLZ_FUTURE_MINUTE_BAR_PATH : str
-        The path inside the tmpdir where this will be written.
-
-    Methods
-    -------
-    make_bcolz_minute_bar_rootdir_path() -> string
-        A class method that returns the path for the directory that contains
-        the minute bar ctables. By default this is a subdirectory
-        BCOLZ_MINUTE_BAR_PATH in the shared temp directory.
-
-    See Also
-    --------
-    WithBcolzEquityDailyBarReader
-    WithDataPortal
-    zipline.testing.create_minute_bar_data
-    """
-
-    BCOLZ_FUTURE_MINUTE_BAR_PATH = "minute_future_pricing"
-    OHLC_RATIOS_PER_SID = None
+    PARQUET_FUTURE_MINUTE_BAR_PATH = "minute_future_pricing.parquet"
 
     @classmethod
-    def make_bcolz_future_minute_bar_rootdir_path(cls):
-        return cls.tmpdir.makedir(cls.BCOLZ_FUTURE_MINUTE_BAR_PATH)
+    def make_parquet_future_minute_bar_rootdir_path(cls):
+        return cls.tmpdir.makedir(cls.PARQUET_FUTURE_MINUTE_BAR_PATH)
 
     @classmethod
     def init_class_fixtures(cls):
-        super(WithBcolzFutureMinuteBarReader, cls).init_class_fixtures()
+        super(WithParquetFutureMinuteBarReader, cls).init_class_fixtures()
         trading_calendar = get_calendar("us_futures")
-        cls.bcolz_future_minute_bar_path = p = (
-            cls.make_bcolz_future_minute_bar_rootdir_path()
+        cls.parquet_future_minute_bar_path = p = (
+            cls.make_parquet_future_minute_bar_rootdir_path()
         )
         days = cls.future_minute_bar_days
 
-        writer = BcolzMinuteBarWriter(
+        writer = ParquetMinuteBarWriter(
             p,
             trading_calendar,
             days[0],
             days[-1],
             FUTURES_MINUTES_PER_DAY,
-            ohlc_ratios_per_sid=cls.OHLC_RATIOS_PER_SID,
         )
         writer.write(cls.make_future_minute_bar_data())
 
-        cls.bcolz_future_minute_bar_reader = BcolzMinuteBarReader(p)
+        cls.parquet_future_minute_bar_reader = ParquetMinuteBarReader(p)
 
 
 class WithConstantEquityMinuteBarData(WithEquityMinuteBarData):
@@ -1745,7 +1472,7 @@ class WithConstantFutureMinuteBarData(WithFutureMinuteBarData):
         return ((sid, frame) for sid in sids)
 
 
-class WithAdjustmentReader(WithBcolzEquityDailyBarReader):
+class WithAdjustmentReader(WithParquetEquityDailyBarReader):
     """
     ZiplineTestCase mixin providing cls.adjustment_reader as a class level
     fixture.
@@ -1779,7 +1506,7 @@ class WithAdjustmentReader(WithBcolzEquityDailyBarReader):
     make_adjustment_writer_equity_daily_bar_reader() -> pd.DataFrame
         A class method that returns the daily bar reader to use for the class's
         adjustment writer. By default this is the class's actual
-        ``bcolz_equity_daily_bar_reader`` as inherited from
+        ``parquet_equity_daily_bar_reader`` as inherited from
         ``WithBcolzEquityDailyBarReader``. This should probably not be
           overridden; however, some tests used a ``MockDailyBarReader``
          for this.
@@ -1813,7 +1540,7 @@ class WithAdjustmentReader(WithBcolzEquityDailyBarReader):
 
     @classmethod
     def make_adjustment_writer_equity_daily_bar_reader(cls):
-        return cls.bcolz_equity_daily_bar_reader
+        return cls.parquet_equity_daily_bar_reader
 
     @classmethod
     def make_adjustment_db_conn_str(cls):
@@ -1853,7 +1580,7 @@ class WithUSEquityPricingPipelineEngine(WithAdjustmentReader, WithTradingSession
         super(WithUSEquityPricingPipelineEngine, cls).init_class_fixtures()
 
         loader = USEquityPricingLoader.without_fx(
-            cls.bcolz_equity_daily_bar_reader,
+            cls.parquet_equity_daily_bar_reader,
             SQLiteAdjustmentReader(cls.adjustments_db_path),
         )
 
@@ -2003,17 +1730,15 @@ class WithSeededRandomPipelineEngine(WithTradingSessions, WithAssetFinder):
 
 class WithDataPortal(
     WithAdjustmentReader,
-    # Ordered so that bcolz minute reader is used first.
-    WithBcolzEquityMinuteBarReader,
-    WithBcolzFutureMinuteBarReader,
+    WithParquetEquityMinuteBarReader,
+    WithParquetFutureMinuteBarReader,
 ):
     """ZiplineTestCase mixin providing self.data_portal as an instance level
     fixture.
 
     After init_instance_fixtures has been called, `self.data_portal` will be
     populated with a new data portal created by passing in the class's
-    trading env, `cls.bcolz_equity_minute_bar_reader`,
-    `cls.bcolz_equity_daily_bar_reader`, and `cls.adjustment_reader`.
+    trading env, minute bar readers, daily bar reader, and adjustment reader.
 
     Attributes
     ----------
@@ -2048,11 +1773,11 @@ class WithDataPortal(
         if self.DATA_PORTAL_FIRST_TRADING_DAY is None:
             if self.DATA_PORTAL_USE_MINUTE_DATA:
                 self.DATA_PORTAL_FIRST_TRADING_DAY = (
-                    self.bcolz_equity_minute_bar_reader.first_trading_day
+                    self.parquet_equity_minute_bar_reader.first_trading_day
                 )
             elif self.DATA_PORTAL_USE_DAILY_DATA:
                 self.DATA_PORTAL_FIRST_TRADING_DAY = (
-                    self.bcolz_equity_daily_bar_reader.first_trading_day
+                    self.parquet_equity_daily_bar_reader.first_trading_day
                 )
 
         return DataPortal(
@@ -2060,12 +1785,12 @@ class WithDataPortal(
             self.trading_calendar,
             first_trading_day=self.DATA_PORTAL_FIRST_TRADING_DAY,
             equity_daily_reader=(
-                self.bcolz_equity_daily_bar_reader
+                self.parquet_equity_daily_bar_reader
                 if self.DATA_PORTAL_USE_DAILY_DATA
                 else None
             ),
             equity_minute_reader=(
-                self.bcolz_equity_minute_bar_reader
+                self.parquet_equity_minute_bar_reader
                 if self.DATA_PORTAL_USE_MINUTE_DATA
                 else None
             ),
@@ -2073,14 +1798,14 @@ class WithDataPortal(
                 self.adjustment_reader if self.DATA_PORTAL_USE_ADJUSTMENTS else None
             ),
             future_minute_reader=(
-                self.bcolz_future_minute_bar_reader
+                self.parquet_future_minute_bar_reader
                 if self.DATA_PORTAL_USE_MINUTE_DATA
                 else None
             ),
             future_daily_reader=(
                 MinuteResampleSessionBarReader(
-                    self.bcolz_future_minute_bar_reader.trading_calendar,
-                    self.bcolz_future_minute_bar_reader,
+                    self.parquet_future_minute_bar_reader.trading_calendar,
+                    self.parquet_future_minute_bar_reader,
                 )
                 if self.DATA_PORTAL_USE_MINUTE_DATA
                 else None

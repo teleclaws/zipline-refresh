@@ -1384,11 +1384,11 @@ class TestFixedReturns(WithMakeAlgo, ZiplineTestCase):
         if self.DATA_PORTAL_FIRST_TRADING_DAY is None:
             if self.DATA_PORTAL_USE_MINUTE_DATA:
                 self.DATA_PORTAL_FIRST_TRADING_DAY = (
-                    self.bcolz_future_minute_bar_reader.first_trading_day
+                    self.parquet_future_minute_bar_reader.first_trading_day
                 )
             elif self.DATA_PORTAL_USE_DAILY_DATA:
                 self.DATA_PORTAL_FIRST_TRADING_DAY = (
-                    self.bcolz_future_daily_bar_reader.first_trading_day
+                    self.parquet_future_daily_bar_reader.first_trading_day
                 )
 
         self.futures_data_portal = DataPortal(
@@ -1396,12 +1396,12 @@ class TestFixedReturns(WithMakeAlgo, ZiplineTestCase):
             self.trading_calendars[Future],
             first_trading_day=self.DATA_PORTAL_FIRST_TRADING_DAY,
             equity_daily_reader=(
-                self.bcolz_equity_daily_bar_reader
+                self.parquet_equity_daily_bar_reader
                 if self.DATA_PORTAL_USE_DAILY_DATA
                 else None
             ),
             equity_minute_reader=(
-                self.bcolz_equity_minute_bar_reader
+                self.parquet_equity_minute_bar_reader
                 if self.DATA_PORTAL_USE_MINUTE_DATA
                 else None
             ),
@@ -1409,14 +1409,14 @@ class TestFixedReturns(WithMakeAlgo, ZiplineTestCase):
                 self.adjustment_reader if self.DATA_PORTAL_USE_ADJUSTMENTS else None
             ),
             future_minute_reader=(
-                self.bcolz_future_minute_bar_reader
+                self.parquet_future_minute_bar_reader
                 if self.DATA_PORTAL_USE_MINUTE_DATA
                 else None
             ),
             future_daily_reader=(
                 MinuteResampleSessionBarReader(
-                    self.bcolz_future_minute_bar_reader.trading_calendar,
-                    self.bcolz_future_minute_bar_reader,
+                    self.parquet_future_minute_bar_reader.trading_calendar,
+                    self.parquet_future_minute_bar_reader,
                 )
                 if self.DATA_PORTAL_USE_MINUTE_DATA
                 else None

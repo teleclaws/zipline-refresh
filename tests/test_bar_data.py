@@ -963,7 +963,7 @@ class TestDailyBarData(
             assert session == bar_data.current_session
 
     def test_day_before_assets_trading(self):
-        # use the day before self.bcolz_daily_bar_days[0]
+        # use the day before self.equity_daily_bar_days[0]
         minute = self.get_last_minute_of_session(
             self.trading_calendar.previous_session(self.equity_daily_bar_days[0])
         )

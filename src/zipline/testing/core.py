@@ -21,13 +21,10 @@ from toolz import concat, curry
 
 from zipline.assets import AssetDBWriter, AssetFinder
 from zipline.assets.synthetic import make_simple_equity_info
-from zipline.data.bcolz_daily_bars import BcolzDailyBarReader, BcolzDailyBarWriter
+from zipline.data.bar_reader import US_EQUITIES_MINUTES_PER_DAY
 from zipline.data.data_portal import DataPortal
-from zipline.data.bcolz_minute_bars import (
-    US_EQUITIES_MINUTES_PER_DAY,
-    BcolzMinuteBarReader,
-    BcolzMinuteBarWriter,
-)
+from zipline.data.parquet_daily_bars import ParquetDailyBarReader, ParquetDailyBarWriter
+from zipline.data.parquet_minute_bars import ParquetMinuteBarReader, ParquetMinuteBarWriter
 from zipline.finance.blotter import SimulationBlotter
 from zipline.finance.order import ORDER_STATUS
 from zipline.lib.labelarray import LabelArray
@@ -365,7 +362,7 @@ def write_minute_data(trading_calendar, tempdir, minutes, sids):
 
     sessions = trading_calendar.sessions_in_range(first_session, last_session)
 
-    write_bcolz_minute_data(
+    write_parquet_minute_data(
         trading_calendar,
         sessions,
         tempdir.path,
@@ -406,8 +403,8 @@ def create_daily_bar_data(sessions, sids):
 
 
 def write_daily_data(tempdir, sim_params, sids, trading_calendar):
-    path = os.path.join(tempdir.path, "testdaily.bcolz")
-    BcolzDailyBarWriter(
+    path = os.path.join(tempdir.path, "testdaily.parquet")
+    ParquetDailyBarWriter(
         path, trading_calendar, sim_params.start_session, sim_params.end_session
     ).write(
         create_daily_bar_data(sim_params.sessions, sids),
@@ -427,7 +424,7 @@ def create_data_portal(
     if sim_params.data_frequency == "daily":
         daily_path = write_daily_data(tempdir, sim_params, sids, trading_calendar)
 
-        equity_daily_reader = BcolzDailyBarReader(daily_path)
+        equity_daily_reader = ParquetDailyBarReader(daily_path)
 
         return DataPortal(
             asset_finder,
@@ -443,7 +440,7 @@ def create_data_portal(
 
         minute_path = write_minute_data(trading_calendar, tempdir, minutes, sids)
 
-        equity_minute_reader = BcolzMinuteBarReader(minute_path)
+        equity_minute_reader = ParquetMinuteBarReader(minute_path)
 
         return DataPortal(
             asset_finder,
@@ -454,8 +451,8 @@ def create_data_portal(
         )
 
 
-def write_bcolz_minute_data(trading_calendar, days, path, data):
-    BcolzMinuteBarWriter(
+def write_parquet_minute_data(trading_calendar, days, path, data):
+    ParquetMinuteBarWriter(
         path, trading_calendar, days[0], days[-1], US_EQUITIES_MINUTES_PER_DAY
     ).write(data)
 
@@ -565,8 +562,8 @@ def create_data_portal_from_trade_history(
     asset_finder, trading_calendar, tempdir, sim_params, trades_by_sid
 ):
     if sim_params.data_frequency == "daily":
-        path = os.path.join(tempdir.path, "testdaily.bcolz")
-        writer = BcolzDailyBarWriter(
+        path = os.path.join(tempdir.path, "testdaily.parquet")
+        writer = ParquetDailyBarWriter(
             path,
             trading_calendar,
             sim_params.start_session,
@@ -576,7 +573,7 @@ def create_data_portal_from_trade_history(
             trades_by_sid_to_dfs(trades_by_sid, sim_params.sessions),
         )
 
-        equity_daily_reader = BcolzDailyBarReader(path)
+        equity_daily_reader = ParquetDailyBarReader(path)
 
         return DataPortal(
             asset_finder,
@@ -620,11 +617,11 @@ def create_data_portal_from_trade_history(
                 }
             ).set_index("dt")
 
-        write_bcolz_minute_data(
+        write_parquet_minute_data(
             trading_calendar, sim_params.sessions, tempdir.path, assets
         )
 
-        equity_minute_reader = BcolzMinuteBarReader(tempdir.path)
+        equity_minute_reader = ParquetMinuteBarReader(tempdir.path)
 
         return DataPortal(
             asset_finder,
@@ -1314,8 +1311,8 @@ class tmp_dir(TempDirectory, object):
 
 
 class _TmpBarReader(tmp_dir, metaclass=ABCMeta):
-    """A helper for tmp_bcolz_equity_minute_bar_reader and
-    tmp_bcolz_equity_daily_bar_reader.
+    """A helper for tmp_parquet_equity_minute_bar_reader and
+    tmp_parquet_equity_daily_bar_reader.
 
     Parameters
     ----------
@@ -1359,8 +1356,8 @@ class _TmpBarReader(tmp_dir, metaclass=ABCMeta):
             raise
 
 
-class tmp_bcolz_equity_minute_bar_reader(_TmpBarReader):
-    """A temporary BcolzMinuteBarReader object.
+class tmp_parquet_equity_minute_bar_reader(_TmpBarReader):
+    """A temporary ParquetMinuteBarReader object.
 
     Parameters
     ----------
@@ -1376,15 +1373,19 @@ class tmp_bcolz_equity_minute_bar_reader(_TmpBarReader):
 
     See Also
     --------
-    tmp_bcolz_equity_daily_bar_reader
+    tmp_parquet_equity_daily_bar_reader
     """
 
-    _reader_cls = BcolzMinuteBarReader
-    _write = staticmethod(write_bcolz_minute_data)
+    _reader_cls = ParquetMinuteBarReader
+    _write = staticmethod(write_parquet_minute_data)
 
 
-class tmp_bcolz_equity_daily_bar_reader(_TmpBarReader):
-    """A temporary BcolzDailyBarReader object.
+# Keep backward-compatible alias
+tmp_bcolz_equity_minute_bar_reader = tmp_parquet_equity_minute_bar_reader
+
+
+class tmp_parquet_equity_daily_bar_reader(_TmpBarReader):
+    """A temporary ParquetDailyBarReader object.
 
     Parameters
     ----------
@@ -1400,14 +1401,18 @@ class tmp_bcolz_equity_daily_bar_reader(_TmpBarReader):
 
     See Also
     --------
-    tmp_bcolz_equity_daily_bar_reader
+    tmp_parquet_equity_daily_bar_reader
     """
 
-    _reader_cls = BcolzDailyBarReader
+    _reader_cls = ParquetDailyBarReader
 
     @staticmethod
     def _write(cal, days, path, data):
-        BcolzDailyBarWriter(path, days).write(data)
+        ParquetDailyBarWriter(path, cal, days[0], days[-1]).write(data)
+
+
+# Keep backward-compatible alias
+tmp_bcolz_equity_daily_bar_reader = tmp_parquet_equity_daily_bar_reader
 
 
 @contextmanager

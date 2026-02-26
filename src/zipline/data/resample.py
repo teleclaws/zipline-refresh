@@ -96,7 +96,11 @@ def minute_to_session(column, close_locs, data, out):
     elif column == "close":
         _minute_to_session_close(close_locs, data, out)
     elif column == "volume":
-        _minute_to_session_volume(close_locs, data, out)
+        _minute_to_session_volume(
+            close_locs,
+            np.asarray(data, dtype=np.float64),
+            out,
+        )
     return out
 
 
@@ -538,7 +542,7 @@ class MinuteResampleSessionBarReader(SessionBarReader):
             if col != "volume":
                 out = np.full(shape, np.nan)
             else:
-                out = np.zeros(shape, dtype=np.uint32)
+                out = np.zeros(shape, dtype=np.float64)
             results.append(out)
 
         for i in range(len(assets)):
@@ -688,7 +692,7 @@ class ReindexBarReader(ABC):
             if field != "volume":
                 out = np.full(shape, np.nan)
             else:
-                out = np.zeros(shape, dtype=np.uint32)
+                out = np.zeros(shape, dtype=np.float64)
 
             if inner_results is not None:
                 out[indices] = inner_results[i]

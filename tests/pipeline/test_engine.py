@@ -893,7 +893,7 @@ class FrameInputTestCase(
                 assert_frame_equal(high_results, high_base.iloc[iloc_bounds])
 
 
-class SyntheticBcolzTestCase(
+class SyntheticBarTestCase(
     zf.WithAdjustmentReader, zf.WithAssetFinder, zf.ZiplineTestCase
 ):
     first_asset_start = pd.Timestamp("2015-04-01")
@@ -925,11 +925,11 @@ class SyntheticBcolzTestCase(
 
     @classmethod
     def init_class_fixtures(cls):
-        super(SyntheticBcolzTestCase, cls).init_class_fixtures()
+        super(SyntheticBarTestCase, cls).init_class_fixtures()
         cls.all_asset_ids = cls.asset_finder.sids
         cls.last_asset_end = cls.equity_info["end_date"].max()
         cls.pipeline_loader = EquityPricingLoader.without_fx(
-            cls.bcolz_equity_daily_bar_reader,
+            cls.parquet_equity_daily_bar_reader,
             cls.adjustment_reader,
         )
         cls.engine = SimplePipelineEngine(

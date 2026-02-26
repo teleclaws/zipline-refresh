@@ -12,7 +12,7 @@ from zipline.data.adjustments import (
     SQLiteAdjustmentReader,
     SQLiteAdjustmentWriter,
 )
-from zipline.data.bcolz_daily_bars import US_EQUITY_PRICING_BCOLZ_COLUMNS
+from zipline.data.bar_reader import US_EQUITY_PRICING_COLUMNS as US_EQUITY_PRICING_BCOLZ_COLUMNS
 
 from zipline.utils.numpy_utils import (
     bool_dtype,

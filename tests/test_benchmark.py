@@ -237,7 +237,7 @@ class TestBenchmark(
                 self.trading_calendar,
                 first_trading_day=reader.first_trading_day,
                 equity_minute_reader=reader,
-                equity_daily_reader=self.bcolz_equity_daily_bar_reader,
+                equity_daily_reader=self.parquet_equity_daily_bar_reader,
                 adjustment_reader=self.adjustment_reader,
             )
 

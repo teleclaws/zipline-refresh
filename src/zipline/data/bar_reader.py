@@ -40,6 +40,14 @@ class NoDataForSid(Exception):
 
 OHLCV = ("open", "high", "low", "close", "volume")
 
+US_EQUITIES_MINUTES_PER_DAY = 390
+FUTURES_MINUTES_PER_DAY = 1440
+
+# Canonical column ordering for daily equity pricing data.
+US_EQUITY_PRICING_COLUMNS = (
+    "open", "high", "low", "close", "volume", "day", "id",
+)
+
 
 class BarReader(ABC):
     @property

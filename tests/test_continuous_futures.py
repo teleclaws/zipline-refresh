@@ -24,7 +24,7 @@ from numpy.testing import assert_almost_equal
 import zipline.testing.fixtures as zf
 from zipline.assets.continuous_futures import OrderedContracts, delivery_predicate
 from zipline.assets.roll_finder import ROLL_DAYS_FOR_CURRENT_CONTRACT, VolumeRollFinder
-from zipline.data.bcolz_minute_bars import FUTURES_MINUTES_PER_DAY
+from zipline.data.bar_reader import FUTURES_MINUTES_PER_DAY
 from zipline.errors import SymbolNotFound
 
 
@@ -1517,7 +1517,7 @@ class ContinuousFuturesTestCase(
         ), "Should remain FOOBARH16 on next session."
 
 
-class RollFinderTestCase(zf.WithBcolzFutureDailyBarReader, zf.ZiplineTestCase):
+class RollFinderTestCase(zf.WithParquetFutureDailyBarReader, zf.ZiplineTestCase):
     START_DATE = pd.Timestamp("2017-01-03")
     END_DATE = pd.Timestamp("2017-05-23")
 
@@ -1531,7 +1531,7 @@ class RollFinderTestCase(zf.WithBcolzFutureDailyBarReader, zf.ZiplineTestCase):
         cls.volume_roll_finder = VolumeRollFinder(
             cls.trading_calendar,
             cls.asset_finder,
-            cls.bcolz_future_daily_bar_reader,
+            cls.parquet_future_daily_bar_reader,
         )
 
     @classmethod

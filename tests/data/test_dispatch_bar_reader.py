@@ -27,9 +27,9 @@ from zipline.data.resample import (
     ReindexSessionBarReader,
 )
 from zipline.testing.fixtures import (
-    WithBcolzEquityMinuteBarReader,
-    WithBcolzEquityDailyBarReader,
-    WithBcolzFutureMinuteBarReader,
+    WithParquetEquityMinuteBarReader,
+    WithParquetEquityDailyBarReader,
+    WithParquetFutureMinuteBarReader,
     WithTradingSessions,
     ZiplineTestCase,
 )
@@ -38,8 +38,8 @@ OHLC = ["open", "high", "low", "close"]
 
 
 class AssetDispatchSessionBarTestCase(
-    WithBcolzEquityDailyBarReader,
-    WithBcolzFutureMinuteBarReader,
+    WithParquetEquityDailyBarReader,
+    WithParquetFutureMinuteBarReader,
     WithTradingSessions,
     ZiplineTestCase,
 ):
@@ -146,13 +146,13 @@ class AssetDispatchSessionBarTestCase(
         readers = {
             Equity: ReindexSessionBarReader(
                 cls.trading_calendar,
-                cls.bcolz_equity_daily_bar_reader,
+                cls.parquet_equity_daily_bar_reader,
                 cls.START_DATE,
                 cls.END_DATE,
             ),
             Future: MinuteResampleSessionBarReader(
                 cls.trading_calendar,
-                cls.bcolz_future_minute_bar_reader,
+                cls.parquet_future_minute_bar_reader,
             ),
         }
         cls.dispatch_reader = AssetDispatchSessionBarReader(
@@ -197,7 +197,7 @@ class AssetDispatchSessionBarTestCase(
 
 
 class AssetDispatchMinuteBarTestCase(
-    WithBcolzEquityMinuteBarReader, WithBcolzFutureMinuteBarReader, ZiplineTestCase
+    WithParquetEquityMinuteBarReader, WithParquetFutureMinuteBarReader, ZiplineTestCase
 ):
     TRADING_CALENDAR_STRS = ("us_futures", "NYSE")
     TRADING_CALENDAR_PRIMARY_CAL = "us_futures"
@@ -304,11 +304,11 @@ class AssetDispatchMinuteBarTestCase(
         readers = {
             Equity: ReindexMinuteBarReader(
                 cls.trading_calendar,
-                cls.bcolz_equity_minute_bar_reader,
+                cls.parquet_equity_minute_bar_reader,
                 cls.START_DATE,
                 cls.END_DATE,
             ),
-            Future: cls.bcolz_future_minute_bar_reader,
+            Future: cls.parquet_future_minute_bar_reader,
         }
         cls.dispatch_reader = AssetDispatchMinuteBarReader(
             cls.trading_calendar, cls.asset_finder, readers

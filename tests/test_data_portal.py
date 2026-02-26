@@ -20,7 +20,7 @@ import pandas as pd
 
 from zipline.assets import Equity, Future
 from zipline.data.data_portal import HISTORY_FREQUENCIES, OHLCV_FIELDS
-from zipline.data.bcolz_minute_bars import (
+from zipline.data.bar_reader import (
     FUTURES_MINUTES_PER_DAY,
     US_EQUITIES_MINUTES_PER_DAY,
 )
@@ -419,7 +419,7 @@ class DataPortalTestBase(WithDataPortal, WithTradingSessions):
         day = calendar.day
         dividend_date = self.trading_days[2]
 
-        prev_day_price = 1.006
+        prev_day_price = 1.0055
         dividend_amount = 0.5  # see self.make_dividends_data
         ratio = 1.0 - dividend_amount / prev_day_price
 

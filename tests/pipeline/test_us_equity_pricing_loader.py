@@ -65,7 +65,7 @@ TEST_CALENDAR_STOP = pd.Timestamp("2015-06-30")
 TEST_QUERY_START = pd.Timestamp("2015-06-10")
 TEST_QUERY_STOP = pd.Timestamp("2015-06-19")
 
-# One asset for each of the cases enumerated in load_raw_arrays_from_bcolz.
+# One asset for each of the cases enumerated in load_raw_arrays.
 EQUITY_INFO = pd.DataFrame(
     [
         # 1) The equity's trades start and end before query.
@@ -542,7 +542,7 @@ class USEquityPricingLoaderTestCase(WithAdjustmentReader, ZiplineTestCase):
         assert adjustments == [{}, {}]
 
         pricing_loader = USEquityPricingLoader.without_fx(
-            self.bcolz_equity_daily_bar_reader,
+            self.parquet_equity_daily_bar_reader,
             adjustment_reader,
         )
 
@@ -619,7 +619,7 @@ class USEquityPricingLoaderTestCase(WithAdjustmentReader, ZiplineTestCase):
         )
 
         pricing_loader = USEquityPricingLoader.without_fx(
-            self.bcolz_equity_daily_bar_reader,
+            self.parquet_equity_daily_bar_reader,
             self.adjustment_reader,
         )
 

@@ -65,11 +65,6 @@ ext_modules = [
         define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
     ),
     Extension(
-        name="zipline.data._equities",
-        sources=["src/zipline/data/_equities.pyx"],
-        define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
-    ),
-    Extension(
         name="zipline.data._adjustments",
         sources=["src/zipline/data/_adjustments.pyx"],
         define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
@@ -87,11 +82,6 @@ ext_modules = [
     Extension(
         name="zipline.gens.sim_engine",
         sources=["src/zipline/gens/sim_engine.pyx"],
-        define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
-    ),
-    Extension(
-        name="zipline.data._minute_bar_internal",
-        sources=["src/zipline/data/_minute_bar_internal.pyx"],
         define_macros=[("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
     ),
     Extension(

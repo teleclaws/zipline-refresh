@@ -45,11 +45,12 @@ from .core import (  # noqa
     tmp_asset_finder,
     tmp_assets_db,
     tmp_bcolz_equity_minute_bar_reader,
+    tmp_parquet_equity_minute_bar_reader,
     tmp_dir,
     to_series,
     to_utc,
     trades_by_sid_to_dfs,
-    write_bcolz_minute_data,
+    write_parquet_minute_data,
     write_compressed,
 )
 from .fixtures import ZiplineTestCase  # noqa
