@@ -4,8 +4,8 @@
 Zipline is a Pythonic algorithmic trading library for backtesting trading strategies. This is the "reloaded" fork maintained by Stefan Jansen after Quantopian closed in 2020.
 
 ## Key Information
-- **Python Version**: >= 3.9
-- **Main Dependencies**: pandas >= 2.0, SQLAlchemy >= 2.0, numpy >= 2.0
+- **Python Version**: >= 3.10
+- **Main Dependencies**: pandas >= 1.3, SQLAlchemy >= 2, numpy >= 1.23, pyarrow >= 14.0
 - **Documentation**: https://zipline.ml4trading.io
 - **Community**: https://exchange.ml4trading.io
 
@@ -14,6 +14,11 @@ Zipline is a Pythonic algorithmic trading library for backtesting trading strate
   - `algorithm.py`: Core algorithm execution
   - `api.py`: Public API functions
   - `data/`: Data ingestion and handling
+    - `parquet_daily_bars.py`: Daily bar storage (Parquet format)
+    - `parquet_minute_bars.py`: Minute bar storage (Parquet format)
+    - `bar_reader.py`: BarReader ABC, shared constants (`US_EQUITIES_MINUTES_PER_DAY`, `FUTURES_MINUTES_PER_DAY`)
+    - `hdf5_daily_bars.py`: HDF5 daily bar storage (multi-country)
+    - `bundles/core.py`: Data bundle ingest/load system (Parquet-only)
   - `finance/`: Financial calculations and order execution
   - `pipeline/`: Factor-based screening system
 - `tests/`: Test suite
@@ -46,9 +51,19 @@ pip install -e .
 4. **Working with trading calendars**: Uses `exchange_calendars` library
 
 ## Current Branch
-You're on branch `v3.1.1` with some modifications to the Quandl bundle and CI fixes.
+`main` — forked from zipline-reloaded with custom modifications.
+
+## Data Storage Architecture
+- **bcolz has been fully removed** (Phase 0-3 migration completed). All bar data uses Apache Parquet via pyarrow.
+- Daily bars: `ParquetDailyBarWriter`/`ParquetDailyBarReader` — single `.parquet` file per bundle, wide format (one row per sid×day)
+- Minute bars: `ParquetMinuteBarWriter`/`ParquetMinuteBarReader` — directory of per-session `.parquet` files
+- Bundle system (`bundles/core.py`) uses Parquet-only paths; no bcolz fallback
+- OHLCV data stored as float64 (not uint32 like the old bcolz format)
+- Test fixtures: `WithParquetEquityDailyBarReader`, `WithParquetEquityMinuteBarReader`, `WithParquetFutureDailyBarReader`, `WithParquetFutureMinuteBarReader`
+- Backward-compat aliases exist: `tmp_bcolz_equity_minute_bar_reader` → `tmp_parquet_equity_minute_bar_reader`
 
 ## Important Notes
-- The project uses Cython for performance-critical components
+- The project uses Cython for performance-critical components (`_resample.pyx`, `_adjustments.pyx`, etc.)
 - Be careful with numpy/pandas API changes due to major version updates
 - Trading calendars are handled by the external `exchange_calendars` package
+- Known pre-existing test failures: `test_clean_before_after` and `test_clean_keep_last` in bundle tests (2014-01-01 not a valid session)
