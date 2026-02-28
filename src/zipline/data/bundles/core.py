@@ -416,6 +416,13 @@ def _make_bundle_core():
         if end_session is None or end_session > calendar.last_session:
             end_session = calendar.last_session
 
+        # Snap to valid trading sessions if the dates fall on non-trading days.
+        if not calendar.is_session(start_session):
+            start_session = calendar.date_to_session(start_session, direction="next")
+
+        if not calendar.is_session(end_session):
+            end_session = calendar.date_to_session(end_session, direction="previous")
+
         if timestamp is None:
             timestamp = pd.Timestamp.utcnow()
         timestamp = timestamp.tz_convert("utc").tz_localize(None)
