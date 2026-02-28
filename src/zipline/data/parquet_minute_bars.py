@@ -424,10 +424,9 @@ class ParquetMinuteBarReader(MinuteBarReader):
         if idx < 0:
             return pd.NaT
 
-        # Reverse search from idx — avoids slicing the entire prefix.
-        vol_array = self._get_field_array("volume")
-        while idx >= 0:
-            if vol_array[idx, col_idx] != 0:
-                return minutes[idx]
-            idx -= 1
-        return pd.NaT
+        # Use NumPy vectorized search — C-speed even for large prefixes.
+        vol_col = self._get_field_array("volume")[:idx + 1, col_idx]
+        nonzero = np.flatnonzero(vol_col)
+        if len(nonzero) == 0:
+            return pd.NaT
+        return minutes[nonzero[-1]]
