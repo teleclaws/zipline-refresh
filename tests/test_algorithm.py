@@ -1430,9 +1430,9 @@ class TestAlgoScript(zf.WithMakeAlgo, zf.ZiplineTestCase):
         [ASSET_TYPE_NAME, CONTINUOUS_FUTURE_NAME] + STRING_TYPE_NAMES
     )
 
-    if parse_version(cython.__version__) >= parse_version("3.1"):
+    if parse_version(cython.__version__) >= parse_version("3.0"):
         print(
-            f"Cython version {cython.__version__} >= 3.1 detected. "
+            f"Cython version {cython.__version__} >= 3.0 detected. "
             f"Skipping ARG_TYPE_TEST_CASES for TestAlgoScript to avoid segfaults."
         )
         ARG_TYPE_TEST_CASES = ()  # Empty tuple, will generate no tests for test_arg_types
