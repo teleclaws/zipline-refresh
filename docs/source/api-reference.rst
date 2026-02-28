@@ -450,10 +450,10 @@ Data API
 
 Writers
 ```````
-.. autoclass:: zipline.data.minute_bars.BcolzMinuteBarWriter
+.. autoclass:: zipline.data.parquet_minute_bars.ParquetMinuteBarWriter
    :members:
 
-.. autoclass:: zipline.data.bcolz_daily_bars.BcolzDailyBarWriter
+.. autoclass:: zipline.data.parquet_daily_bars.ParquetDailyBarWriter
    :members:
 
 .. autoclass:: zipline.data.adjustments.SQLiteAdjustmentWriter
@@ -464,10 +464,10 @@ Writers
 
 Readers
 ```````
-.. autoclass:: zipline.data.minute_bars.BcolzMinuteBarReader
+.. autoclass:: zipline.data.parquet_minute_bars.ParquetMinuteBarReader
    :members:
 
-.. autoclass:: zipline.data.bcolz_daily_bars.BcolzDailyBarReader
+.. autoclass:: zipline.data.parquet_daily_bars.ParquetDailyBarReader
    :members:
 
 .. autoclass:: zipline.data.adjustments.SQLiteAdjustmentReader

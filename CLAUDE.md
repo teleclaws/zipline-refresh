@@ -66,4 +66,5 @@ pip install -e .
 - The project uses Cython for performance-critical components (`_resample.pyx`, `_adjustments.pyx`, etc.)
 - Be careful with numpy/pandas API changes due to major version updates
 - Trading calendars are handled by the external `exchange_calendars` package
-- Known pre-existing test failures: `test_clean_before_after` and `test_clean_keep_last` in bundle tests (2014-01-01 not a valid session)
+- Bundle ingest snaps start/end sessions to valid trading days (e.g. 2014-01-01 → 2014-01-02 for NYSE)
+- `test_arg_types` in `test_algorithm.py` is skipped on Cython >= 3.0 to avoid segfaults
