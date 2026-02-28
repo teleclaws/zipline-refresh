@@ -183,7 +183,11 @@ class DailyHistoryAggregator:
         opens = []
         session_label = self._trading_calendar.minute_to_session(dt)
 
-        for asset in assets:
+        # Collect assets needing full-window load for batch I/O.
+        needs_full_window = []
+        needs_full_window_idx = []
+
+        for i, asset in enumerate(assets):
             if not asset.is_alive_for_session(session_label):
                 opens.append(np.nan)
                 continue
@@ -222,20 +226,26 @@ class DailyHistoryAggregator:
                         opens.append(val)
                         continue
                 except KeyError:
-                    window = self._minute_reader.load_raw_arrays(
-                        ["open"],
-                        market_open,
-                        dt,
-                        [asset],
-                    )[0]
-                    nonnan = window[~pd.isnull(window)]
-                    if len(nonnan):
-                        val = nonnan[0]
-                    else:
-                        val = np.nan
-                    entries[asset] = (dt_value, val)
-                    opens.append(val)
+                    needs_full_window.append(asset)
+                    needs_full_window_idx.append(len(opens))
+                    opens.append(np.nan)  # placeholder
                     continue
+
+        # Batch load for all cache-miss assets at once.
+        if needs_full_window:
+            batch = self._minute_reader.load_raw_arrays(
+                ["open"],
+                market_open,
+                dt,
+                needs_full_window,
+            )[0]
+            for j, asset in enumerate(needs_full_window):
+                col = batch[:, j]
+                nonnan = col[~np.isnan(col)]
+                val = nonnan[0] if len(nonnan) else np.nan
+                entries[asset] = (dt_value, val)
+                opens[needs_full_window_idx[j]] = val
+
         return np.array(opens)
 
     def highs(self, assets, dt):
@@ -252,7 +262,10 @@ class DailyHistoryAggregator:
         highs = []
         session_label = self._trading_calendar.minute_to_session(dt)
 
-        for asset in assets:
+        needs_full_window = []
+        needs_full_window_idx = []
+
+        for i, asset in enumerate(assets):
             if not asset.is_alive_for_session(session_label):
                 highs.append(np.nan)
                 continue
@@ -294,16 +307,23 @@ class DailyHistoryAggregator:
                         highs.append(val)
                         continue
                 except KeyError:
-                    window = self._minute_reader.load_raw_arrays(
-                        ["high"],
-                        market_open,
-                        dt,
-                        [asset],
-                    )[0].T
-                    val = nanmax(window)
-                    entries[asset] = (dt_value, val)
-                    highs.append(val)
+                    needs_full_window.append(asset)
+                    needs_full_window_idx.append(len(highs))
+                    highs.append(np.nan)  # placeholder
                     continue
+
+        if needs_full_window:
+            batch = self._minute_reader.load_raw_arrays(
+                ["high"],
+                market_open,
+                dt,
+                needs_full_window,
+            )[0]
+            for j, asset in enumerate(needs_full_window):
+                val = nanmax(batch[:, j])
+                entries[asset] = (dt_value, val)
+                highs[needs_full_window_idx[j]] = val
+
         return np.array(highs)
 
     def lows(self, assets, dt):
@@ -320,7 +340,10 @@ class DailyHistoryAggregator:
         lows = []
         session_label = self._trading_calendar.minute_to_session(dt)
 
-        for asset in assets:
+        needs_full_window = []
+        needs_full_window_idx = []
+
+        for i, asset in enumerate(assets):
             if not asset.is_alive_for_session(session_label):
                 lows.append(np.nan)
                 continue
@@ -357,16 +380,23 @@ class DailyHistoryAggregator:
                         lows.append(val)
                         continue
                 except KeyError:
-                    window = self._minute_reader.load_raw_arrays(
-                        ["low"],
-                        market_open,
-                        dt,
-                        [asset],
-                    )[0].T
-                    val = nanmin(window)
-                    entries[asset] = (dt_value, val)
-                    lows.append(val)
+                    needs_full_window.append(asset)
+                    needs_full_window_idx.append(len(lows))
+                    lows.append(np.nan)  # placeholder
                     continue
+
+        if needs_full_window:
+            batch = self._minute_reader.load_raw_arrays(
+                ["low"],
+                market_open,
+                dt,
+                needs_full_window,
+            )[0]
+            for j, asset in enumerate(needs_full_window):
+                val = nanmin(batch[:, j])
+                entries[asset] = (dt_value, val)
+                lows[needs_full_window_idx[j]] = val
+
         return np.array(lows)
 
     def closes(self, assets, dt):
@@ -455,7 +485,10 @@ class DailyHistoryAggregator:
         volumes = []
         session_label = self._trading_calendar.minute_to_session(dt)
 
-        for asset in assets:
+        needs_full_window = []
+        needs_full_window_idx = []
+
+        for i, asset in enumerate(assets):
             if not asset.is_alive_for_session(session_label):
                 volumes.append(0)
                 continue
@@ -492,16 +525,23 @@ class DailyHistoryAggregator:
                         volumes.append(val)
                         continue
                 except KeyError:
-                    window = self._minute_reader.load_raw_arrays(
-                        ["volume"],
-                        market_open,
-                        dt,
-                        [asset],
-                    )[0]
-                    val = np.nansum(window)
-                    entries[asset] = (dt_value, val)
-                    volumes.append(val)
+                    needs_full_window.append(asset)
+                    needs_full_window_idx.append(len(volumes))
+                    volumes.append(0)  # placeholder
                     continue
+
+        if needs_full_window:
+            batch = self._minute_reader.load_raw_arrays(
+                ["volume"],
+                market_open,
+                dt,
+                needs_full_window,
+            )[0]
+            for j, asset in enumerate(needs_full_window):
+                val = np.nansum(batch[:, j])
+                entries[asset] = (dt_value, val)
+                volumes[needs_full_window_idx[j]] = val
+
         return np.array(volumes)
 
 

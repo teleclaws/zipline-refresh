@@ -215,6 +215,7 @@ class ParquetMinuteBarReader(MinuteBarReader):
 
     def __init__(self, rootdir):
         self._rootdir = rootdir
+        self._field_cache = {}
 
     # -- Metadata / properties -------------------------------------------
 
@@ -277,28 +278,23 @@ class ParquetMinuteBarReader(MinuteBarReader):
         """Map from sid (int) to column index in the data arrays."""
         return {sid: i for i, sid in enumerate(self._sids)}
 
-    @lazyval
-    def _field_data(self):
-        """Dict mapping field name to np.ndarray (num_minutes, num_sids).
+    def _get_field_array(self, field):
+        """Load a single OHLCV field on demand.
 
-        OHLC fields are float64 with NaN for missing.
-        Volume is float64 with 0 for missing.
+        Arrays are cached after first load so subsequent accesses are free.
         """
-        result = {}
-        sid_cols = [str(s) for s in self._sids]
-
-        for field in FIELDS:
+        if field not in self._field_cache:
+            sid_cols = [str(s) for s in self._sids]
             path = os.path.join(self._rootdir, f"{field}.parquet")
-            table = pq.read_table(path)
-            df = table.to_pandas()
-            df = df.reindex(columns=sid_cols)
-
-            arr = df.values.astype(np.float64)
+            table = pq.read_table(path, columns=sid_cols)
+            df = table.to_pandas().reindex(columns=sid_cols)
+            arr = df.values
+            if arr.dtype != np.float64:
+                arr = arr.astype(np.float64)
             if field == "volume":
-                arr = np.nan_to_num(arr, nan=0.0)
-            result[field] = arr
-
-        return result
+                np.nan_to_num(arr, copy=False, nan=0.0)
+            self._field_cache[field] = arr
+        return self._field_cache[field]
 
     # -- Core interface methods ------------------------------------------
 
@@ -347,7 +343,7 @@ class ParquetMinuteBarReader(MinuteBarReader):
 
         results = []
         for field in fields:
-            data = self._field_data[field]
+            data = self._get_field_array(field)
             sliced = data[minute_slice][:, col_indices].copy()
 
             if field in OHLC:
@@ -393,7 +389,7 @@ class ParquetMinuteBarReader(MinuteBarReader):
             )
 
         col_idx = self._sid_to_col_idx[sid_int]
-        value = self._field_data[field][idx, col_idx]
+        value = self._get_field_array(field)[idx, col_idx]
 
         if field != "volume":
             if value == 0 or np.isnan(value):
@@ -428,9 +424,10 @@ class ParquetMinuteBarReader(MinuteBarReader):
         if idx < 0:
             return pd.NaT
 
-        volumes = self._field_data["volume"][:idx + 1, col_idx]
-        nonzero = np.flatnonzero(volumes)
-        if len(nonzero) == 0:
-            return pd.NaT
-
-        return minutes[nonzero[-1]]
+        # Reverse search from idx — avoids slicing the entire prefix.
+        vol_array = self._get_field_array("volume")
+        while idx >= 0:
+            if vol_array[idx, col_idx] != 0:
+                return minutes[idx]
+            idx -= 1
+        return pd.NaT

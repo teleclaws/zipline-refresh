@@ -324,9 +324,6 @@ class ParquetDailyBarReader(CurrencyAwareSessionBarReader):
         Path to the directory containing the Parquet files.
     """
 
-    def __init__(self, rootdir):
-        self._rootdir = rootdir
-
     @lazyval
     def _metadata(self):
         path = os.path.join(self._rootdir, "_metadata.json")
@@ -372,32 +369,28 @@ class ParquetDailyBarReader(CurrencyAwareSessionBarReader):
         """Map from sid (int) to column index in the data arrays."""
         return {sid: i for i, sid in enumerate(self._sids)}
 
-    @lazyval
-    def _field_data(self):
-        """Dict mapping field name to np.ndarray of shape (num_dates, num_sids).
+    def __init__(self, rootdir):
+        self._rootdir = rootdir
+        self._field_cache = {}
 
-        OHLC fields are float64 with NaN for missing values.
-        Volume is float64 with 0 for missing values.
+    def _get_field_array(self, field):
+        """Load a single OHLCV field on demand.
+
+        Arrays are cached after first load so subsequent accesses are free.
         """
-        result = {}
-        sid_cols = [str(s) for s in self._sids]
-
-        for field in FIELDS:
+        if field not in self._field_cache:
+            sid_cols = [str(s) for s in self._sids]
             path = os.path.join(self._rootdir, f"{field}.parquet")
-            table = pq.read_table(path)
-            df = table.to_pandas()
-
-            # Reindex columns to match our canonical sid order.
-            # Missing sids get NaN columns.
-            df = df.reindex(columns=sid_cols)
-
-            arr = df.values.astype(np.float64)
+            table = pq.read_table(path, columns=sid_cols)
+            # Reindex to canonical sid order (adds NaN cols for missing sids).
+            df = table.to_pandas().reindex(columns=sid_cols)
+            arr = df.values
+            if arr.dtype != np.float64:
+                arr = arr.astype(np.float64)
             if field == "volume":
-                # Replace NaN with 0 for volume.
-                arr = np.nan_to_num(arr, nan=0.0)
-            result[field] = arr
-
-        return result
+                np.nan_to_num(arr, copy=False, nan=0.0)
+            self._field_cache[field] = arr
+        return self._field_cache[field]
 
     @lazyval
     def _lifetimes(self):
@@ -409,13 +402,10 @@ class ParquetDailyBarReader(CurrencyAwareSessionBarReader):
     def _lifetimes_map(self):
         """Dict mapping sid (int) to (start_date, end_date) timestamps."""
         df = self._lifetimes
-        result = {}
-        for _, row in df.iterrows():
-            result[int(row["sid"])] = (
-                pd.Timestamp(row["start_date"]),
-                pd.Timestamp(row["end_date"]),
-            )
-        return result
+        sids = df["sid"].values.astype(np.int64)
+        starts = pd.to_datetime(df["start_date"].values)
+        ends = pd.to_datetime(df["end_date"].values)
+        return dict(zip(sids, zip(starts, ends)))
 
     @lazyval
     def _currency_codes_df(self):
@@ -467,7 +457,7 @@ class ParquetDailyBarReader(CurrencyAwareSessionBarReader):
         n_dates = end_idx - start_idx + 1
         results = []
         for column in columns:
-            data = self._field_data[column]
+            data = self._get_field_array(column)
             sliced = data[date_slice][:, col_indices].copy()
 
             if column in OHLC:
@@ -519,7 +509,7 @@ class ParquetDailyBarReader(CurrencyAwareSessionBarReader):
 
         date_idx = self._date_to_index(dt)
         col_idx = self._sid_to_col_idx[sid_int]
-        value = self._field_data[field][date_idx, col_idx]
+        value = self._get_field_array(field)[date_idx, col_idx]
 
         if field != "volume":
             if value == 0 or np.isnan(value):
@@ -565,7 +555,7 @@ class ParquetDailyBarReader(CurrencyAwareSessionBarReader):
             return pd.NaT
 
         col_idx = self._sid_to_col_idx[sid_int]
-        volumes = self._field_data["volume"]
+        volumes = self._get_field_array("volume")
 
         try:
             day_idx = self._date_to_index(day)
