@@ -235,7 +235,7 @@ More examples in the [examples](src/zipline/examples) directory.
 
 ## Contributing
 
-This project is sponsored by [Kavout](https://kavout.com).
+This project is sponsored by [Kavout](https://kavout.com). Built upon the work of [Quantopian/zipline](https://github.com/quantopian/zipline) and [stefan-jansen/zipline-reloaded](https://github.com/stefan-jansen/zipline-reloaded).
 
 Found a bug or have a suggestion? [Open an issue](https://github.com/teleclaws/zipline-refresh/issues/new).
 
